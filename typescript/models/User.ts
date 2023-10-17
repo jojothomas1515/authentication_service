@@ -1,61 +1,60 @@
-import { IUser } from './../@types/index';
-import {Table, Column, Model, DataType, CreatedAt, ForeignKey, HasOne} from 'sequelize-typescript'
+import {Column, CreatedAt, DataType, ForeignKey, HasOne, Model, Table} from 'sequelize-typescript'
 import Role from "./Role";
 
 @Table({tableName: 'users', timestamps: false})
 export default class User extends Model<User> {
   @Column({type: DataType.UUID, defaultValue: DataType.UUIDV4, primaryKey: true})
-    id: string;
+  declare id: string;
 
   @Column({type: DataType.STRING, allowNull: true})
-    username: string;
+  declare username: string;
 
   @Column({type: DataType.STRING, allowNull: false, field: 'first_name'})
-    firstName: string;
+  declare firstName: string;
 
   @Column({type: DataType.STRING, allowNull: false, field: 'last_name'})
-    lastName: string;
+  declare lastName: string;
 
   @Column({type: DataType.STRING, allowNull: false})
-    email: string;
+  declare email: string;
 
   @Column({type: DataType.TEXT, field: 'section_order'})
-    sectionOrder: string;
+  declare sectionOrder: string;
 
   @Column({type: DataType.STRING})
-    password: string;
+  declare password: string;
 
   @Column({type: DataType.STRING})
-    provider: string;
+  declare provider: string;
 
   @Column({type: DataType.TEXT, field: 'profile_pic'})
-    profilePic: string;
+  declare profilePic: string;
 
   @Column({type: DataType.STRING, field: 'refresh_token'})
-    refreshToken: string;
+  declare refreshToken: string;
 
-  @Column({type: DataType.STRING, field: 'two_fa_code', allowNull: true })
-    twoFACode: string;
+  @Column({type: DataType.STRING, field: 'two_fa_code', allowNull: true})
+  declare twoFACode: string;
 
   @ForeignKey(() => Role)
   @Column({type: DataType.INTEGER, defaultValue: 2, allowNull: false, field: 'role_id'})
-    roleId: number;
+  declare roleId: number;
 
   @Column({type: DataType.BOOLEAN, defaultValue: false, field: 'is_verified'})
-    isVerified: boolean;
+  declare isVerified: boolean;
 
   @Column({type: DataType.BOOLEAN, defaultValue: false, field: 'two_factor_auth'})
-    twoFactorAuth: boolean;
+  declare twoFactorAuth: boolean;
 
   @Column({type: DataType.STRING(255)})
-    location: string;
+  declare location: string;
 
   @Column({type: DataType.STRING(255)})
-    country: string;
+  declare country: string;
 
   @CreatedAt
-    createdAt: Date;
+  declare createdAt: Date;
 
   @HasOne(() => Role, 'role_id')
-    userRole: Role;
+  declare userRole: Role;
 }

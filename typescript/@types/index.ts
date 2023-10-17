@@ -1,3 +1,5 @@
+import { Request } from 'express';
+
 export interface IUser {
   id?: string;
   username?: string;
@@ -41,4 +43,8 @@ export interface IRolePermission {
   roleId: number;
   permissionId: number;
   createdAt: Date;
+}
+
+export interface GenericRequest<T> extends Request {
+  user?: T;
 }

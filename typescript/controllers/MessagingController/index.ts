@@ -1,13 +1,10 @@
-import { Request, Response } from "express";
+import { Response} from "express";
 import jwt from "jsonwebtoken";
 import axios from "axios";
-import { success } from "../../utils";
+import {success} from "../../utils";
+import {IUser} from '../../@types'
+import {GenericRequest} from "../../@types";
 
-interface IUser {
-  id: string;
-  firstName: string;
-  email: string;
-}
 /**
  *
  * @param user
@@ -19,11 +16,11 @@ export const createJwtToken = (user: IUser): string => {
     firstName: user.firstName,
     email: user.email,
   };
-  return jwt.sign(jwtPayload, process.env.JWT_SECRET as string, { expiresIn: 600 });
+  return jwt.sign(jwtPayload, process.env.JWT_SECRET as string, {expiresIn: 600});
 };
 
 export const generateVerificationLink = (token: string, NODE_ENV: string): string => {
-  const { VERIFY_EMAIL_ENDPOINT_LIVE, VERIFY_EMAIL_ENDPOINT_DEV } = process.env;
+  const {VERIFY_EMAIL_ENDPOINT_LIVE, VERIFY_EMAIL_ENDPOINT_DEV} = process.env;
   const endpoint =
     NODE_ENV === "production"
       ? VERIFY_EMAIL_ENDPOINT_LIVE
@@ -39,7 +36,7 @@ export const generateVerificationLink = (token: string, NODE_ENV: string): strin
  */
 const sendEmail = async (
   emailServiceUrl: string,
-  data: any
+  data: unknown,
 ): Promise<boolean> => {
   try {
     const response = await axios.post(emailServiceUrl, data);
@@ -56,12 +53,12 @@ const sendEmail = async (
  */
 
 const sendPasswordResetEmail = async (
-  req: Request,
-  res: Response
+  req: GenericRequest<IUser>,
+  res: Response,
 ): Promise<void> => {
-  const { EMAIL_SERVICE_PASSWORD_RESET_URL, PASSWORD_RESET_SUCCESS_URL } =
+  const {EMAIL_SERVICE_PASSWORD_RESET_URL, PASSWORD_RESET_SUCCESS_URL} =
     process.env;
-  const { user } = req as any;
+  const {user} = req;
 
   //   Generate JWT token
   const token = createJwtToken(user);
@@ -72,13 +69,14 @@ const sendPasswordResetEmail = async (
   const emailSent = await sendEmail(emailServiceUrl, {
     recipient: user.email,
     name: user.firstName,
+    // eslint-disable-next-line camelcase
     reset_link: passwordResetLink,
   });
 
   if (emailSent) {
     success("Password reset link sent successfully", 200);
   } else {
-    res.status(500).json({ status: 500, message: "Email not sent" });
+    res.status(500).json({status: 500, message: "Email not sent"});
   }
 };
 
@@ -88,20 +86,20 @@ const sendPasswordResetEmail = async (
  * @param res
  */
 const resendVerification = async (
-  req: Request | any,
-  res: Response
+  req: GenericRequest<IUser>,
+  res: Response,
 ): Promise<void> => {
-  const { EMAIL_SERVICE_VERIFY_EMAIL_URL, NODE_ENV } = process.env;
+  const {EMAIL_SERVICE_VERIFY_EMAIL_URL, NODE_ENV} = process.env;
   const user = req.user as IUser | undefined;
 
   if (!user) {
-    res.status(401).json({ status: 401, message: "User not found" });
+    res.status(401).json({status: 401, message: "User not found"});
   }
 
-  const { id, firstName, email } = req.user;
+  const {id, firstName, email} = req.user;
 
   //   Generate JWT token
-  const token = createJwtToken({ id, firstName, email });
+  const token = createJwtToken({id, firstName, email} as IUser);
 
   // const verificationLink =
   //   NODE_ENV === "production"
@@ -113,6 +111,7 @@ const resendVerification = async (
   const emailSent = await sendEmail(emailServiceUrl, {
     recipient: email,
     name: firstName,
+    // eslint-disable-next-line camelcase
     verification_link: verificationLink,
   });
 
@@ -120,10 +119,10 @@ const resendVerification = async (
     success(
       "Verification email resent. Please check your email for the verification link",
       req.user,
-      200
+      200,
     );
   } else {
-    res.status(500).json({ status: 500, message: "Email not sent" });
+    res.status(500).json({status: 500, message: "Email not sent"});
   }
 };
 
@@ -133,19 +132,19 @@ const resendVerification = async (
  * @param res
  */
 const sendSignUpEmail = async (
-  req: Request | any,
-  res: Response
+  req: GenericRequest<IUser>,
+  res: Response,
 ): Promise<void> => {
-  const { EMAIL_SERVICE_VERIFY_EMAIL_URL, NODE_ENV } = process.env;
+  const {EMAIL_SERVICE_VERIFY_EMAIL_URL, NODE_ENV} = process.env;
 
-  const user = req.user as IUser | undefined;
+  const user = req.user;
   if (!user) {
-    res.status(401).json({ status: 401, message: "User not found" });
+    res.status(401).json({status: 401, message: "User not found"});
   }
-  const { id, firstName, email } = req.user;
+  const {id, firstName, email} = req.user;
 
   //   Generate JWT token
-  const token = createJwtToken({ id, firstName, email });
+  const token = createJwtToken({id, firstName, email} as IUser);
 
   const emailServiceUrl = EMAIL_SERVICE_VERIFY_EMAIL_URL as string;
   // const verificationLink =
@@ -157,6 +156,7 @@ const sendSignUpEmail = async (
   const emailSent = await sendEmail(emailServiceUrl, {
     recipient: email,
     name: firstName,
+    // eslint-disable-next-line camelcase
     verification_link: verificationLink,
   });
 
@@ -164,10 +164,10 @@ const sendSignUpEmail = async (
     success(
       "Verification email resent. Please check your email for the verification link",
       req.user,
-      200
+      200,
     );
   } else {
-    res.status(500).json({ status: 500, message: "Email not sent" });
+    res.status(500).json({status: 500, message: "Email not sent"});
   }
 };
 
@@ -179,9 +179,9 @@ const sendSignUpEmail = async (
  */
 const sendWelcomeMail = async (
   name: string,
-  recipient: string
+  recipient: string,
 ): Promise<string> => {
-  const { EMAIL_SERVICE_WELCOME_URL, AUTH_FRONTEND_DASHBOARD_URL } =
+  const {EMAIL_SERVICE_WELCOME_URL, AUTH_FRONTEND_DASHBOARD_URL} =
     process.env;
   const emailServiceUrl = EMAIL_SERVICE_WELCOME_URL as string;
   const redirectLink = AUTH_FRONTEND_DASHBOARD_URL as string;
@@ -189,6 +189,7 @@ const sendWelcomeMail = async (
   const emailSent = await sendEmail(emailServiceUrl, {
     name,
     recipient,
+    // eslint-disable-next-line camelcase
     call_to_action: redirectLink,
   });
   return emailSent

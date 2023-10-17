@@ -61,17 +61,21 @@ const routeNotFound = (req: Request, res: Response, next: NextFunction) => {
 };
 
 const errorHandler = (
-  err: HttpError,
-  req: Request,
+  err: HttpError | Error,
+  _req: Request,
   res: Response,
-  next: NextFunction
-) => {
-  const { statusCode, status, message } = err;
-  res.status(statusCode).json({
-    status,
-    statusCode,
-    message,
-  });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _next: NextFunction
+): Response => {
+  if (err instanceof HttpError) {
+    const {statusCode, status, message} = err;
+    return res.status(statusCode).json({
+      status,
+      statusCode,
+      message,
+    });
+  }
+  return res.status(500).json({error: "Internal Server Error", statusCode:500})
 };
 
 export {

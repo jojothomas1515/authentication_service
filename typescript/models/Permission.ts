@@ -1,13 +1,13 @@
-import {Model, Table, Column, CreatedAt, DataType} from "sequelize-typescript";
+import {Column, CreatedAt, DataType, Model, Table} from "sequelize-typescript";
 
 @Table({tableName: 'permissions', timestamps: false})
 export default class Permission extends Model<Permission> {
-@Column({type: DataType.INTEGER, primaryKey: true, autoIncrement: true})
-  id: number;
+  @Column({type: DataType.INTEGER, primaryKey: true, autoIncrement: true})
+  declare id: number;
 
-    @Column({type: DataType.STRING, allowNull: false})
-      name: string;
+  @Column({type: DataType.STRING, allowNull: false})
+  declare name: string;
 
-    @CreatedAt
-      createdAt: Date;
+  @CreatedAt
+  declare createdAt: Date;
 }

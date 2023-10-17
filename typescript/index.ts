@@ -3,7 +3,8 @@ import sequelize from "./config/db.config";
 import userRouterHandler from "./routes/userRouter";
 import rbacRouterHandler from "./routes/rbacRouter";
 import cors from "cors";
-import dotenv from "dotenv"; // ES6 import for dotenv
+import dotenv from "dotenv";
+import {errorHandler, routeNotFound} from "./middlewares/error"; // ES6 import for dotenv
 // import { errorHandler } from "./middlewares/error";
 
 dotenv.config(); // Load environment variables from .env file
@@ -31,8 +32,8 @@ sequelize
 
 app.use("/api/auth", userRouterHandler);
 app.use("/api/roles", rbacRouterHandler);
-
-// app.use(errorHandler);
+app.use("/api", routeNotFound)
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

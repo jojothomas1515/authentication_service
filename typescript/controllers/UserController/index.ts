@@ -9,8 +9,9 @@ import {
   verify2FSchema,
   updateUserSchema,
 } from "./validation";
-import { Request, Response } from "express";
+import {NextFunction, Request, Response} from "express";
 import { errorResponse, generateToken, success } from "../../utils";
+import {HttpError} from "../../middlewares/error";
 
 /**
  * @param req
@@ -18,17 +19,16 @@ import { errorResponse, generateToken, success } from "../../utils";
  * @returns
  */
 
-export const signUp = async (req: Request, res: Response) => {
+export const signUp = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = registerSchema.validate(req.body);
     if (result.error) {
-      throw new Error("result.error.details");
-      // return errorResponse(result.error.details, 400, res);
+      throw new HttpError(400, result.error.details.join(','));
     }
     const findUser = await userService.signUp(req.body);
     return success("Account created successfully", findUser, 201, res);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err)
   }
 };
 
