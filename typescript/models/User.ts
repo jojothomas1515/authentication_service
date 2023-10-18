@@ -21,7 +21,7 @@ export default class User extends Model<User> {
   @Column({type: DataType.TEXT, field: 'section_order'})
   declare sectionOrder: string;
 
-  @Column({type: DataType.STRING})
+  @Column({type: DataType.STRING, field: 'password'})
   declare password: string;
 
   @Column({type: DataType.STRING})
@@ -32,9 +32,6 @@ export default class User extends Model<User> {
 
   @Column({type: DataType.STRING, field: 'refresh_token'})
   declare refreshToken: string;
-
-  @Column({type: DataType.STRING, field: 'two_fa_code', allowNull: true})
-  declare twoFACode: string;
 
   @ForeignKey(() => Role)
   @Column({type: DataType.INTEGER, defaultValue: 2, allowNull: false, field: 'role_id'})
@@ -55,6 +52,18 @@ export default class User extends Model<User> {
   @CreatedAt
   declare createdAt: Date;
 
+  @Column({type: DataType.DATE, field:'last_login'})
+  declare lastLogin: Date
+
+  @Column( {type: DataType.BOOLEAN, field: 'is_seller'})
+  declare isSeller: boolean
+
   @HasOne(() => Role, 'role_id')
   declare userRole: Role;
+
+  toJSON(): Partial<User> {
+    const res = super.toJSON();
+    delete res.password;
+    return res
+  }
 }

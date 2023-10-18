@@ -6,77 +6,72 @@ import {
   welcomeEmailNotification,
 } from "../../controllers/UserController/messaging";
 import {
-  IUserPayload,
   comparePassword,
   errorResponse,
   generateFourDigitPassword,
   generateToken,
   hashPassword,
+  IUserPayload,
   success,
   verifyToken,
 } from "../../utils/index";
-import { IUserSignUp } from "../../interfaces/user/userSignupInterface";
+import {IUserSignUp} from "../../interfaces/user/userSignupInterface";
 import User from "../../models/User";
-import { IUserService } from "./IUserService";
-import { IUser } from "../../@types";
-import { Response } from "express";
+import {IUserService} from "./IUserService";
+import {IUser} from "../../@types";
+import {Response} from "express";
+import {BadRequest, Conflict, ResourceNotFound, Unauthorized} from "../../middlewares/error";
+import HttpErrorCodes from "../../error/httpErrorCodes";
 
 export class UserService implements IUserService {
   public async findUserByEmail(email: string): Promise<User | null> {
-    try {
-      const findUser = await User.findOne({ where: { email } });
-      return findUser || null;
-    } catch (err) {
-      throw new Error("Error finding user by email: " + err.message);
-    }
+    return await User.findOne({where: {email}});
   }
+
   /**
    *
    * @param payload
    * @returns
    */
   public async signUp(payload: IUserSignUp): Promise<User> {
-    const { firstName, lastName, email, password } = payload;
+    const {firstName, lastName, email, password} = payload;
 
-    try {
-      const findUser = await this.findUserByEmail(email);
+    const findUser = await this.findUserByEmail(email);
 
-      if (findUser) {
-        throw new Error("User already exists")
-        // errorResponse("User already exists", 409, res);
-      }
-
-      const hashedPassword = await hashPassword(password);
-
-      const newUser = await User.create({
-        firstName,
-        lastName,
-        email,
-        password: hashedPassword,
-      });
-
-      // Generate token and send email
-      const payload: IUserPayload = {
-        email: newUser.email,
-        id: newUser.id,
-        firstName: newUser.firstName,
-      };
-      const token = generateToken(payload);
-      const verificationLink = `${process.env.AUTH_FRONTEND_URL}/auth/verification-complete?token=${token}`;
-
-      sendSignUpNotification(
-        newUser.email,
-        newUser.firstName,
-        verificationLink
-      );
-      // delete findUser.password;
-      return newUser;
-    } catch (err) {
-      throw new Error('Internal Server Error')
-      // throw new AuthErrorHandler(AuthErrorHandler.InternalServerError);
-      // errorResponse("Internal Server Error", 500, res);
+    if (findUser) {
+      throw new Conflict("User already exists", HttpErrorCodes.EXISTING_USER_EMAIL)
+      // errorResponse("User already exists", 409, res);
     }
+
+    const hashedPassword = await hashPassword(password);
+
+    let newUser = await User.create({
+      firstName,
+      lastName,
+      email,
+      password: hashedPassword,
+      username: "",
+    });
+
+    // Generate token and send email
+    const tPayload: IUserPayload = {
+      email: newUser.email,
+      id: newUser.id,
+      firstName: newUser.firstName,
+    };
+    const token = generateToken(tPayload);
+    const verificationLink = `${process.env.AUTH_FRONTEND_URL}/auth/verification-complete?token=${token}`;
+
+    sendSignUpNotification(
+      newUser.email,
+      newUser.firstName,
+      verificationLink,
+    );
+    // delete findUser.password;
+    newUser = await User.findOne({where: {email}})
+    return newUser;
   }
+
   /**
    *
    * @param payload
@@ -86,36 +81,28 @@ export class UserService implements IUserService {
     payload: {
       email: string;
       password: string;
-    }
+    },
     // res: Response
   ): Promise<IUser> {
-    const { email, password } = payload;
-    try {
-      const findUser = await this.findUserByEmail(email);
+    const {email, password} = payload;
+    const findUser = await this.findUserByEmail(email);
 
-      if (!findUser) {
-        throw new Error("Invalid username or password");
-        // return errorResponse("Invalid username or password", 403, res);
-      }
-
-      if (findUser.isVerified === false) {
-        throw new Error("Email not verified");
-
-        // return errorResponse("Email not verified", 403, res);
-      }
-
-      const isMatch = await comparePassword(password, findUser.password);
-
-      if (!isMatch) {
-        throw new Error("Invalid username or password");
-        // return errorResponse("Invalid username or password", 403, res);
-      }
-      delete findUser.password;
-      return findUser;
-    } catch (err) {
-      throw new Error("Internal Server Error");
-      // return errorResponse("Internal Server Error", 500, res);
+    if (!findUser) {
+      throw new ResourceNotFound("User not found", HttpErrorCodes.RESOURCE_NOT_FOUND);
     }
+
+    if (findUser.isVerified === false) {
+      throw new Unauthorized("Please verify your account", HttpErrorCodes.USER_NOT_VERIFIED);
+    }
+
+    const isMatch = await comparePassword(password, findUser.password);
+
+    if (!isMatch) {
+      throw new Unauthorized("Invalid password", HttpErrorCodes.INVALID_PASSWORD);
+      // return errorResponse("Invalid username or password", 403, res);
+    }
+    return findUser;
+
   }
 
   /**
@@ -125,57 +112,43 @@ export class UserService implements IUserService {
    */
   public async verifyUser(
     token: string,
-    res: Response
-  ): Promise<IUser | unknown> {
+  ): Promise<User> {
+
     const decodedUser = verifyToken(token);
 
     if (!decodedUser) {
-      return errorResponse("Invalid token", 401, res);
+      throw new Unauthorized("Invalid token", HttpErrorCodes.INVALID_TOKEN);
     }
 
-    try {
-      const findUser = await this.findUserByEmail(decodedUser.email);
+    const findUser = await this.findUserByEmail(decodedUser.email);
 
-      if (!findUser) {
-        return errorResponse("Invalid token", 401, res);
-      }
-
-      if (findUser.isVerified) {
-        return errorResponse("Account already verify", 401, res);
-      }
-
-      findUser.isVerified = true;
-      await findUser.save();
-      const link = `${process.env.AUTH_FRONTEND_URL}`;
-      welcomeEmailNotification(findUser.email, findUser.firstName, link);
-
-      return findUser;
-    } catch (err) {
-      return errorResponse("An error occurred", 500, res);
+    if (!findUser) {
+      throw new Unauthorized("Invalid token", HttpErrorCodes.INVALID_TOKEN);
     }
+
+    if (findUser.isVerified) {
+      throw new BadRequest("Account already verified. please login", HttpErrorCodes.EMAIL_ALREADY_VERIFIED);
+    }
+
+    findUser.isVerified = true;
+    await findUser.save();
+    const link = `${process.env.AUTH_FRONTEND_URL}`;
+    welcomeEmailNotification(findUser.email, findUser.firstName, link);
+    return findUser;
+
   }
+
   /**
    *
    * @param email
    * @returns
    */
-  public async checkEmail(email: string, res: Response): Promise<unknown> {
-    try {
-      const findUser = await this.findUserByEmail(email);
+  public async checkEmail(email: string): Promise<boolean> {
+    const findUser = await this.findUserByEmail(email);
 
-      if (!findUser) {
-        return success(
-          "Email is available for use",
-          { email: email },
-          200,
-          res
-        );
-      }
-      return errorResponse("Email already in use", 403, res);
-    } catch (err) {
-      return errorResponse("Internal Server Error", 500, res);
-    }
+    return !findUser ? false : true;
   }
+
   /**
    *
    * @param email
@@ -200,7 +173,7 @@ export class UserService implements IUserService {
       sendSignUpNotification(
         findUser.email,
         findUser.firstName,
-        verificationLink
+        verificationLink,
       );
       // sendVerificationEmail(findUser.firstName, findUser.email, token);
       return success(
@@ -211,7 +184,7 @@ export class UserService implements IUserService {
           token,
         },
         200,
-        res
+        res,
       );
     } catch (err) {
       return errorResponse("Internal Server Error", 500);
@@ -247,12 +220,13 @@ export class UserService implements IUserService {
           email: findUser.email,
         },
         200,
-        res
+        res,
       );
     } catch (err) {
       return errorResponse("Internal Server Error", 500, res);
     }
   }
+
   /**
    *
    * @param payload
@@ -263,9 +237,9 @@ export class UserService implements IUserService {
   public async changePassword(
     payload: { currentPassword: string; newPassword: string },
     userId: string,
-    res: Response
+    res: Response,
   ): Promise<IUser | unknown> {
-    const { currentPassword, newPassword } = payload;
+    const {currentPassword, newPassword} = payload;
 
     const findUser = await User.findByPk(userId);
 
@@ -275,7 +249,7 @@ export class UserService implements IUserService {
 
     const matchPassword = await comparePassword(
       currentPassword,
-      findUser.password
+      findUser.password,
     );
     if (!matchPassword) {
       return errorResponse("invalid current password", 403, res);
@@ -284,6 +258,7 @@ export class UserService implements IUserService {
     await findUser.save();
     return findUser;
   }
+
   /**
    *
    * @param email
@@ -312,11 +287,12 @@ export class UserService implements IUserService {
     resetPasswordNotification(
       findUser.email,
       findUser.firstName,
-      verificationLink
+      verificationLink,
     );
 
     return findUser;
   }
+
   /**
    *
    * @param token
@@ -327,7 +303,7 @@ export class UserService implements IUserService {
   public async resetPassword(
     token: string,
     password: string,
-    res: Response
+    res: Response,
   ): Promise<unknown> {
     const decodedUser = verifyToken(token);
 
@@ -345,6 +321,7 @@ export class UserService implements IUserService {
     await findUser.save();
     return findUser;
   }
+
   /**
    *
    * @param token
@@ -368,6 +345,7 @@ export class UserService implements IUserService {
 
     return user;
   }
+
   /**
    *
    * @param email
@@ -385,6 +363,7 @@ export class UserService implements IUserService {
 
     return findUser;
   }
+
   /**
    *
    * @param email
@@ -402,13 +381,12 @@ export class UserService implements IUserService {
         return errorResponse("Not allowed", 403, res);
       }
       const code = await generateFourDigitPassword();
-      findUser.twoFACode = code;
 
       await findUser.save();
       twoFactorAuthNotification(
         findUser.email,
         findUser.firstName,
-        findUser.twoFACode
+        code,
       );
       return findUser;
     } catch (err) {
@@ -438,6 +416,7 @@ export class UserService implements IUserService {
       return errorResponse("Internal Server Error", 500, res);
     }
   }
+
   /**
    *
    * @param id
@@ -446,7 +425,7 @@ export class UserService implements IUserService {
    */
   public async findUserById(
     userId: string,
-    res: Response
+    res: Response,
   ): Promise<IUser | unknown> {
     try {
       const findUser = await User.findByPk(userId);
@@ -459,12 +438,13 @@ export class UserService implements IUserService {
       return errorResponse("Internal Server Error", 500, res);
     }
   }
+
   public async deleteUserById(
     userId: string,
-    res: Response
+    res: Response,
   ): Promise<IUser | unknown> {
     try {
-      const findUser = await User.destroy({ where: { id: userId } });
+      const findUser = await User.destroy({where: {id: userId}});
 
       if (!findUser) {
         return errorResponse("User not found", 404, res);
@@ -478,9 +458,9 @@ export class UserService implements IUserService {
   public async updateUserById(
     payload: { firstName: string; lastName: string },
     email: string,
-    res: Response
+    res: Response,
   ): Promise<unknown> {
-    const { firstName, lastName } = payload;
+    const {firstName, lastName} = payload;
     try {
       const findUser = await this.findUserByEmail(email);
 
@@ -493,9 +473,9 @@ export class UserService implements IUserService {
       await findUser.save();
       return success(
         "Deleted successfully",
-        { id: findUser.id, email: findUser.email },
+        {id: findUser.id, email: findUser.email},
         201,
-        res
+        res,
       );
     } catch (error) {
       return errorResponse("Internal Server Error", 500, res);
@@ -504,7 +484,7 @@ export class UserService implements IUserService {
 
   public async resendVerification(
     email: string,
-    res: Response
+    res: Response,
   ): Promise<unknown> {
     try {
       const findUser = await this.findUserByEmail(email);
@@ -528,7 +508,7 @@ export class UserService implements IUserService {
       sendSignUpNotification(
         findUser.email,
         findUser.firstName,
-        verificationLink
+        verificationLink,
       );
       // sendVerificationEmail(findUser.firstName, findUser.email, token);
       return success(
@@ -539,7 +519,7 @@ export class UserService implements IUserService {
           token,
         },
         200,
-        res
+        res,
       );
     } catch (error) {
       throw new Error("Internal Server Error");
